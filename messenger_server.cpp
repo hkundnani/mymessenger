@@ -273,13 +273,14 @@ void accept_invitation(int client, char *friendName, char* msg, const char *file
 }
 
 int main(int argc, char *argv[]) {
-    int sockfd, maxfd, clients[MAXCLIENTS], clientfd, len, index, rv, num = 0;
+    int sockfd, maxfd, clients[MAXCLIENTS], clientfd, len, index, num = 0;
     long portNum = 0;
     char *port = NULL;
     char *tokens[SIZE];
-    // char hostname[SIZE];
-    struct sockaddr_in *addr, newaddr;
-    struct addrinfo address, *result, *p;
+    char hostname[SIZE];
+    char service[SIZE];
+    struct sockaddr_in address, newaddr;
+    struct addrinfo *result;
     std::string username;
     //set of socket descriptors  
     fd_set readfds, clfds;
@@ -289,11 +290,11 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    // sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    // if (sockfd == 0) {
-    //     perror("socket failed");
-    //     exit(EXIT_FAILURE);
-    // }
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd == 0) {
+        perror("socket failed");
+        exit(EXIT_FAILURE);
+    }
 
     port = get_port(argv[2]);
     if (port != NULL) {
@@ -303,46 +304,14 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
     memset(&address, 0, sizeof(address));
-    address.ai_family = AF_INET;
-    // address.sin_addr.s_addr = htonl(INADDR_ANY);
-    address.ai_socktype = SOCK_STREAM;
-    // address.sin_port = (portNum == 0 ? portNum : htons((short)portNum));
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_ANY);
+    address.sin_port = (portNum == 0 ? portNum : htons((short)portNum));
 
-    if ((rv = getaddrinfo(NULL, port, &address, &result)) != 0) {
-        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-        exit(1);
-    }
-
-    for (p = result; p != NULL; p = p->ai_next) {
-        if ((sockfd = socket(p->ai_family, p->ai_socktype,
-                p->ai_protocol)) == -1) {
-            perror("socket");
-            continue;
-        }
-
-        if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-            close(sockfd);
-            perror("bind");
-            continue;
-        }
-
-        break; // if we get here, we must have connected successfully
-    }
-
-    if (p == NULL) {
-        // looped off the end of the list with no successful bind
-        fprintf(stderr, "failed to bind socket\n");
-        exit(2);
-    }
-
-    addr = (struct sockaddr_in *)result->ai_addr;
-    printf("ip = %s, port = %d\n", inet_ntoa((struct in_addr)addr->sin_addr), ntohs(addr->sin_port));
-
-    freeaddrinfo(result); // all done with this structure
-    // if (bind(sockfd, (struct sockaddr *)&address, sizeof(address)) < 0) {
-	// 	perror("bind");
-	// 	exit(EXIT_FAILURE);
-	// }
+    if (bind(sockfd, (struct sockaddr *)&address, sizeof(address)) < 0) {
+		perror("bind");
+		exit(EXIT_FAILURE);
+	}
 
     printf("Waititng for connection...\n");
 
@@ -352,7 +321,9 @@ int main(int argc, char *argv[]) {
 		perror("can't get name");
 		exit(EXIT_FAILURE);
 	}
+    getnameinfo((struct sockaddr *)&address, sizeof address, hostname, sizeof hostname, service, sizeof service, 0);
 
+    printf("ip = %s, port = %s\n", hostname, service);
 	// printf("ip = %s, port = %d\n", inet_ntoa(address.sin_addr), ntohs(address.sin_port));
 
 	if (listen(sockfd, 5) < 0) {
