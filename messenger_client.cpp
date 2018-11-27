@@ -4,11 +4,12 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <unistd.h>
+#include <netdb.h>
 #include <iostream>
 #include <pthread.h>
 #include <map>
 #include <sys/socket.h>
-// #include <sys/types.h>
+#include <sys/types.h>
 // #include <sys/wait.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -229,6 +230,7 @@ int main(int argc, char *argv[]) {
     std::string username;
     std::string password;
     pthread_t tid, sid;
+    struct hostent *he;
     char *tokens[BUFFSIZE];
 
     if (argc < 2) {
@@ -256,8 +258,14 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    if ( (he = gethostbyname(host) ) == NULL ) {
+        printf ("Couldn't find ip\n");
+      exit(1); /* error */
+    }
+
+    memcpy(&address.sin_addr, he->h_addr_list[0], he->h_length);
     address.sin_family = AF_INET;
-    address.sin_addr.s_addr = inet_addr(host);
+    // address.sin_addr.s_addr = inet_addr(host);
     address.sin_port = (portNum == 0 ? portNum : htons((short)portNum));
 
     if (connect(sockfd, (struct sockaddr *)&address, sizeof(address)) < 0) {
