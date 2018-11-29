@@ -279,8 +279,8 @@ int main(int argc, char *argv[]) {
     char *tokens[SIZE];
     char hostname[SIZE];
     char service[SIZE];
-    struct sockaddr_in address, newaddr;
-    struct addrinfo *result;
+    struct sockaddr_in newaddr;
+    struct addrinfo address, *result, *addr;
     std::string username;
     //set of socket descriptors  
     fd_set readfds, clfds;
@@ -290,28 +290,46 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd == 0) {
-        perror("socket failed");
-        exit(EXIT_FAILURE);
-    }
-
     port = get_port(argv[2]);
-    if (port != NULL) {
-        portNum = strtol(port, NULL, 0);
-    } else {
+    if (port == NULL) {
         printf("Error: No port field in the config file");
         exit(EXIT_FAILURE);
     }
-    memset(&address, 0, sizeof(address));
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = htonl(INADDR_ANY);
-    address.sin_port = (portNum == 0 ? portNum : htons((short)portNum));
 
-    if (bind(sockfd, (struct sockaddr *)&address, sizeof(address)) < 0) {
-		perror("bind");
-		exit(EXIT_FAILURE);
-	}
+    memset(&address, 0, sizeof(address));
+    address.ai_family = AF_INET;
+    address.ai_socktype = SOCK_STREAM;
+    address.ai_flags = AI_PASSIVE;
+
+    if ((getaddrinfo(NULL, port, &address, &result)) != 0) {
+        perror("Error");
+        exit(EXIT_FAILURE);
+    }
+    
+    for (addr = result; addr != NULL; addr = addr->ai_next) {
+        if ((sockfd = socket(addr->ai_family, addr->ai_socktype,
+            addr->ai_protocol)) == -1) {
+            perror("socket");
+            continue;
+        }
+
+        if (bind(sockfd, addr->ai_addr, addr->ai_addrlen) == -1) {
+            close(sockfd);
+            perror("bind");
+            continue;
+        }
+
+        break;
+    }
+
+    if (addr == NULL) {
+        fprintf(stderr, "failed to bind socket\n");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("ip = %s, port = %d\n", inet_ntoa(((struct sockaddr_in *)addr->ai_addr)->sin_addr), ntohs(((struct sockaddr_in *)addr->ai_addr)->sin_port));
+
+    freeaddrinfo(result);
 
     printf("Waititng for connection...\n");
 
@@ -321,10 +339,7 @@ int main(int argc, char *argv[]) {
 		perror("can't get name");
 		exit(EXIT_FAILURE);
 	}
-    getnameinfo((struct sockaddr *)&address, sizeof address, hostname, sizeof hostname, service, sizeof service, 0);
 
-    printf("ip = %s, port = %s\n", hostname, service);
-	// printf("ip = %s, port = %d\n", inet_ntoa(address.sin_addr), ntohs(address.sin_port));
 
 	if (listen(sockfd, 5) < 0) {
 		perror("bind");
