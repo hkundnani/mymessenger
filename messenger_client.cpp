@@ -118,8 +118,10 @@ void *connection_handler(void *arg) {
 
 void *create_new_socket(void *arg) {
     pthread_detach(pthread_self());
-    int sockfd, *sock_ptr, clientfd;
-    struct sockaddr_in servaddr, clientaddr;
+    int sockfd, *sock_ptr, clientfd, len;
+    struct sockaddr_in clientaddr;
+    struct addrinfo servaddr, *result, *addr;
+    char hostname[SIZE];
     socklen_t sock_len;
     pthread_t tid;
 
@@ -129,14 +131,61 @@ void *create_new_socket(void *arg) {
         exit(EXIT_FAILURE);
     }
 
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    servaddr.sin_port = htons(5100);
+    // servaddr.sin_family = AF_INET;
+    // servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    // servaddr.sin_port = htons(5100);
 
-    if (bind(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
-		perror("bind");
+    memset(&servaddr, 0, sizeof(servaddr));
+    servaddr.ai_family = AF_INET;
+    servaddr.ai_socktype = SOCK_STREAM;
+    servaddr.ai_flags = AI_PASSIVE;
+
+    // if (bind(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
+	// 	perror("bind");
+	// 	exit(EXIT_FAILURE);
+	// }
+
+    gethostname(hostname, sizeof hostname);
+
+    if ((getaddrinfo(hostname, "5100", &servaddr, &result)) != 0) {
+        perror("Error");
+        exit(EXIT_FAILURE);
+    }
+    
+    for (addr = result; addr != NULL; addr = addr->ai_next) {
+        if ((sockfd = socket(addr->ai_family, addr->ai_socktype,
+            addr->ai_protocol)) == -1) {
+            perror("socket");
+            continue;
+        }
+
+        if (bind(sockfd, addr->ai_addr, addr->ai_addrlen) == -1) {
+            close(sockfd);
+            perror("bind");
+            continue;
+        }
+
+        break;
+    }
+
+    if (addr == NULL) {
+        fprintf(stderr, "failed to bind socket\n");
+        exit(EXIT_FAILURE);
+    }
+
+    len = sizeof(addr->ai_addrlen);
+
+    if (getsockname(sockfd, (struct sockaddr *)addr->ai_addr, (socklen_t *)&len) < 0)
+	{
+		perror("can't get name");
 		exit(EXIT_FAILURE);
 	}
+
+    printf("ip = %s, port = %d\n", inet_ntoa(((struct sockaddr_in *)addr->ai_addr)->sin_addr), ntohs(((struct sockaddr_in *)addr->ai_addr)->sin_port));
+
+    freeaddrinfo(result);
+
+    printf("Waititng for connection...\n");
 
     sock_len = sizeof(clientaddr);
 

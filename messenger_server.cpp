@@ -53,12 +53,10 @@ void get_port(const char *fileName, std::string &port) {
             parse_input(buffer, tokens, COLON);
             if (strcmp(tokens[0], "port") == 0) {
                 port = tokens[1];
-                // return port;
             } 
         }
     }
     fclose(file);
-    // return NULL;
 }
 
 bool validate_login(char *username, char *password, const char *fileName) {
@@ -275,12 +273,9 @@ void accept_invitation(int client, char *friendName, char* msg, const char *file
 
 int main(int argc, char *argv[]) {
     int sockfd, maxfd, clients[MAXCLIENTS], clientfd, len, index, num = 0;
-    // long portNum = 0;
-    // char *port = NULL;
     std::string port = "";
     char *tokens[SIZE];
     char hostname[SIZE];
-    // char service[SIZE];
     struct sockaddr_in newaddr;
     struct addrinfo address, *result, *addr;
     std::string username;
