@@ -39,7 +39,7 @@ void parse_input (char *input, char **tokens, const char *delim) {
     tokens[index] = NULL;
 }
 
-char *get_port(const char *fileName) {
+void get_port(const char *fileName, std::string &port) {
     FILE *file;
     char buffer[SIZE];
     char *tokens[SIZE];
@@ -52,12 +52,13 @@ char *get_port(const char *fileName) {
         while(fgets(buffer, SIZE, file) != NULL) {
             parse_input(buffer, tokens, COLON);
             if (strcmp(tokens[0], "port") == 0) {
-                return tokens[1];
+                port = tokens[1];
+                // return port;
             } 
         }
     }
     fclose(file);
-    return NULL;
+    // return NULL;
 }
 
 bool validate_login(char *username, char *password, const char *fileName) {
@@ -274,11 +275,12 @@ void accept_invitation(int client, char *friendName, char* msg, const char *file
 
 int main(int argc, char *argv[]) {
     int sockfd, maxfd, clients[MAXCLIENTS], clientfd, len, index, num = 0;
-    long portNum = 0;
-    char *port = NULL;
+    // long portNum = 0;
+    // char *port = NULL;
+    std::string port = "";
     char *tokens[SIZE];
     char hostname[SIZE];
-    char service[SIZE];
+    // char service[SIZE];
     struct sockaddr_in newaddr;
     struct addrinfo address, *result, *addr;
     std::string username;
@@ -290,8 +292,8 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    port = get_port(argv[2]);
-    if (port == NULL) {
+    get_port(argv[2], port);
+    if (port.compare("") == 0) {
         printf("Error: No port field in the config file");
         exit(EXIT_FAILURE);
     }
@@ -301,7 +303,9 @@ int main(int argc, char *argv[]) {
     address.ai_socktype = SOCK_STREAM;
     address.ai_flags = AI_PASSIVE;
 
-    if ((getaddrinfo(NULL, port, &address, &result)) != 0) {
+    gethostname(hostname, sizeof hostname);
+
+    if ((getaddrinfo(hostname, port.c_str(), &address, &result)) != 0) {
         perror("Error");
         exit(EXIT_FAILURE);
     }
@@ -327,19 +331,21 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    printf("ip = %s, port = %d\n", inet_ntoa(((struct sockaddr_in *)addr->ai_addr)->sin_addr), ntohs(((struct sockaddr_in *)addr->ai_addr)->sin_port));
+    len = sizeof(addr->ai_addrlen);
 
-    freeaddrinfo(result);
-
-    printf("Waititng for connection...\n");
-
-    len = sizeof(address);
-	if (getsockname(sockfd, (struct sockaddr *)&address, (socklen_t *)&len) < 0)
+    if (getsockname(sockfd, (struct sockaddr *)addr->ai_addr, (socklen_t *)&len) < 0)
 	{
 		perror("can't get name");
 		exit(EXIT_FAILURE);
 	}
 
+    // printf("ip = %s, port = %d\n", inet_ntoa(address.), htons(address.sin_port));
+
+    printf("ip = %s, port = %d\n", inet_ntoa(((struct sockaddr_in *)addr->ai_addr)->sin_addr), ntohs(((struct sockaddr_in *)addr->ai_addr)->sin_port));
+
+    freeaddrinfo(result);
+
+    printf("Waititng for connection...\n");
 
 	if (listen(sockfd, 5) < 0) {
 		perror("bind");
