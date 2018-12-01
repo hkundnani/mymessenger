@@ -147,7 +147,8 @@ void *create_new_socket(void *arg) {
 
     gethostname(hostname, sizeof hostname);
 
-    if ((getaddrinfo(hostname, "5100", &servaddr, &result)) != 0) {
+    // Remember to change the port to 5100 before submit
+    if ((getaddrinfo(hostname, "60784", &servaddr, &result)) != 0) {
         perror("Error");
         exit(EXIT_FAILURE);
     }
