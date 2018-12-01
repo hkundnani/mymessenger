@@ -52,7 +52,6 @@ void get_port(const char *fileName, std::string &port) {
         while(fgets(buffer, SIZE, file) != NULL) {
             parse_input(buffer, tokens, COLON);
             if (strcmp(tokens[0], "servport") == 0) {
-                fclose(file);
                 port = tokens[1];
             } 
         }
@@ -74,7 +73,6 @@ void get_host(const char *fileName, std::string &host) {
         while(fgets(buffer, SIZE, file) != NULL) {
             parse_input(buffer, tokens, COLON);
             if (strcmp(tokens[0], "servhost") == 0) {
-                fclose(file);
                 host = tokens[1];
             } 
         }
