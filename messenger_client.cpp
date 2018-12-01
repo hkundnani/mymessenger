@@ -39,7 +39,7 @@ void parse_input (char *input, char **tokens, const char *delim) {
     tokens[index] = NULL;
 }
 
-char *get_port(const char *fileName) {
+void get_port(const char *fileName, std::string &port) {
     FILE *file;
     char buffer[SIZE];
     char *tokens[SIZE];
@@ -53,15 +53,15 @@ char *get_port(const char *fileName) {
             parse_input(buffer, tokens, COLON);
             if (strcmp(tokens[0], "servport") == 0) {
                 fclose(file);
-                return tokens[1];
+                port = tokens[1];
             } 
         }
     }
     fclose(file);
-    return NULL;
+    // return NULL;
 }
 
-char *get_host(const char *fileName) {
+void get_host(const char *fileName, std::string &host) {
     FILE *file;
     char buffer[SIZE];
     char *tokens[SIZE];
@@ -75,12 +75,12 @@ char *get_host(const char *fileName) {
             parse_input(buffer, tokens, COLON);
             if (strcmp(tokens[0], "servhost") == 0) {
                 fclose(file);
-                return tokens[1];
+                host = tokens[1];
             } 
         }
     }
     fclose(file);
-    return NULL;
+    // return NULL;
 }
 
 std::string menu_after() {
@@ -223,14 +223,13 @@ int main(int argc, char *argv[]) {
     int clisockfd;
     int status = 1;
     long portNum = 0;
-    char *port = NULL;
-    char *host = NULL;
+    std::string port = "";
+    std::string host = "";
     struct sockaddr_in address, clisockaddr;
     std::string user_input;
     std::string username;
     std::string password;
     pthread_t tid, sid;
-    struct hostent *he;
     char *tokens[BUFFSIZE];
 
     if (argc < 2) {
@@ -244,28 +243,26 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    port = get_port(argv[1]);
-    if (port != NULL) {
-        portNum = strtol(port, NULL, 0);
-    } else {
+    get_port(argv[1], port);
+    std::cout << port << std::endl;
+    if (port.compare("") == 0) {
         std::cout << "Error: No port field in the config file";
         exit(EXIT_FAILURE);
+    } else {
+        portNum = strtol(port.c_str(), NULL, 0);
     }
+    std::cout << portNum << std::endl;
 
-    host = get_host(argv[1]);
-    if (host == NULL) {
+    get_host(argv[1], host);
+    std::cout << host << std::endl;
+    if (host.compare("") == 0) {
         std::cout << "Error: No host field in the config file";
         exit(EXIT_FAILURE);
     }
 
-    if ( (he = gethostbyname(host) ) == NULL ) {
-        printf ("Couldn't find ip\n");
-      exit(1); /* error */
-    }
-
-    memcpy(&address.sin_addr, he->h_addr_list[0], he->h_length);
+    memset(&address, 0, sizeof(address));
     address.sin_family = AF_INET;
-    // address.sin_addr.s_addr = inet_addr(host);
+    address.sin_addr.s_addr = inet_addr(host.c_str());
     address.sin_port = (portNum == 0 ? portNum : htons((short)portNum));
 
     if (connect(sockfd, (struct sockaddr *)&address, sizeof(address)) < 0) {
