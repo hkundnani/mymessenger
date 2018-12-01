@@ -244,19 +244,16 @@ int main(int argc, char *argv[]) {
     }
 
     get_port(argv[1], port);
-    std::cout << port << std::endl;
     if (port.compare("") == 0) {
-        std::cout << "Error: No port field in the config file";
+        std::cout << "Error: No port field in the config file\n";
         exit(EXIT_FAILURE);
     } else {
         portNum = strtol(port.c_str(), NULL, 0);
     }
-    std::cout << portNum << std::endl;
 
     get_host(argv[1], host);
-    std::cout << host << std::endl;
     if (host.compare("") == 0) {
-        std::cout << "Error: No host field in the config file";
+        std::cout << "Error: No host field in the config file\n";
         exit(EXIT_FAILURE);
     }
 
