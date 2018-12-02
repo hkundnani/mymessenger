@@ -181,7 +181,7 @@ void *create_new_socket(void *arg) {
 		perror("can't get name");
 		exit(EXIT_FAILURE);
 	}
-
+    socketCreated = true;
     printf("ip = %s, port = %d\n", inet_ntoa(((struct sockaddr_in *)addr->ai_addr)->sin_addr), ntohs(((struct sockaddr_in *)addr->ai_addr)->sin_port));
 
     freeaddrinfo(result);
@@ -357,6 +357,7 @@ int main(int argc, char *argv[]) {
         } else if (menu == 2) {
             if (!socketCreated) {
                 pthread_create(&sid, NULL, &create_new_socket, NULL);
+                // create_new_socket(NULL);
             }
             user_input = menu_after();
             std::string temp_input = user_input;
@@ -364,13 +365,13 @@ int main(int argc, char *argv[]) {
             // std::string friend_name = user_input.substr(first_token.size())
             parse_input(&user_input[0], tokens, PIPE);
             if (strcmp(tokens[0], "i") == 0){
-                if ((write(sockfd, user_input.c_str(), user_input.length())) == -1) {
+                if ((write(sockfd, temp_input.c_str(), temp_input.length())) == -1) {
                     perror("Send");
                     close(sockfd);
                     exit(EXIT_FAILURE);
                 }
             } else if (strcmp(tokens[0], "ia") == 0) {
-                if ((write(sockfd, user_input.c_str(), user_input.length())) == -1) {
+                if ((write(sockfd, temp_input.c_str(), temp_input.length())) == -1) {
                     perror("Send");
                     close(sockfd);
                     exit(EXIT_FAILURE);

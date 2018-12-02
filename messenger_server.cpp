@@ -184,14 +184,33 @@ void send_invitation(int client, char *friendName, char* msg) {
         if (stoi(iti->second["fd"]) == client) {
             username = iti->first;
         }
-        if (frnd.compare(iti->first) == 0) {
-            fd = stoi(userLocInfo[frnd]["fd"]);
-            invitation = "i|" + username + "|" + message;
-            if ((send(fd, &invitation[0], invitation.size(), 0)) == -1) {
-                perror("send");
-                // close(fd);
-                // FD_CLR(fd, &readfds);   
-                // clients[i] = 0;
+    }
+    if (username.compare(frnd) == 0) {
+        message = "You can't send invitation to yourself";
+        if ((send(client, &message[0], message.size(), 0)) == -1) {
+            perror("send");
+            // close(fd);
+            // FD_CLR(fd, &readfds);   
+            // clients[i] = 0;
+        }
+    } else {
+        for (iti = userLocInfo.begin(); iti != userLocInfo.end(); ++iti) {
+            if (frnd.compare(iti->first) == 0) {
+                fd = stoi(userLocInfo[frnd]["fd"]);
+                invitation = "i|" + username + "|" + message;
+                if ((send(fd, &invitation[0], invitation.size(), 0)) == -1) {
+                    perror("send");
+                    // close(fd);
+                    // FD_CLR(fd, &readfds);   
+                    // clients[i] = 0;
+                }
+                message = "Invitation Sent";
+                if ((send(client, &message[0], message.size(), 0)) == -1) {
+                    perror("send");
+                    // close(fd);
+                    // FD_CLR(fd, &readfds);   
+                    // clients[i] = 0;
+                }
             }
         }
     }
@@ -401,9 +420,6 @@ int main(int argc, char *argv[]) {
                 maxfd = clientfd;
             }
         }
-
-            //inform user of socket number - used in send and receive commands  
-            // printf("New connection , socket fd is %d , ip is : %s , port : %d\n", sockfd, inet_ntoa(address.sin_addr), ntohs(address.sin_port));
 
         //else its some IO operation on some other socket 
         for (int i = 0; i < MAXCLIENTS; i++)   
