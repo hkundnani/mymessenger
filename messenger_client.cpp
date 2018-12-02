@@ -199,6 +199,14 @@ void *create_new_socket(void *arg) {
     return(NULL);
 }
 
+void print_online_friends() {
+    std::map<std::string, std::map<std::string, std::string> >::iterator iti;
+    std::cout << "Online Friends:" << std::endl;
+    for (iti = userLocInfo.begin(); iti != userLocInfo.end(); ++iti) {
+        std::cout << iti->first << std::endl;
+    }
+}
+
 void *process_connection(void *arg) {
     int n;
     char recvBuff[BUFFSIZE];
@@ -232,6 +240,7 @@ void *process_connection(void *arg) {
                 locInfo.insert(std::pair<std::string, std::string>("port", tokens[3]));
                 locInfo.insert(std::pair<std::string, std::string>("fd", "0"));
                 userLocInfo[tokens[1]] = locInfo;
+                print_online_friends();
             } else if(strcmp(tokens[0], "i") == 0) {
                 std::cout << "You have received an invitation from ";
                 std::cout << tokens[1] << std::endl;
