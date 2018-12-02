@@ -17,11 +17,12 @@
 const int SIZE = 80;
 const int BUFFSIZE = 1024;
 const char *COLON = " \t\n\r:";
-const char *PIPE = " \t\n\r|";
+const char *PIPE = "|";
 int sockfd, menu = 1, invitation = 0; 
 std::string invitationMsg;
 bool socketCreated = false;
 const int MAXCLIENTS = 5;
+const std::string PORTNUM = "60784";
 
 std::map<std::string, std::map<std::string, std::string> > userLocInfo;
 
@@ -131,24 +132,15 @@ void *create_new_socket(void *arg) {
         exit(EXIT_FAILURE);
     }
 
-    // servaddr.sin_family = AF_INET;
-    // servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    // servaddr.sin_port = htons(5100);
-
     memset(&servaddr, 0, sizeof(servaddr));
     servaddr.ai_family = AF_INET;
     servaddr.ai_socktype = SOCK_STREAM;
     servaddr.ai_flags = AI_PASSIVE;
 
-    // if (bind(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
-	// 	perror("bind");
-	// 	exit(EXIT_FAILURE);
-	// }
-
     gethostname(hostname, sizeof hostname);
 
     // Remember to change the port to 5100 before submit
-    if ((getaddrinfo(hostname, "60784", &servaddr, &result)) != 0) {
+    if ((getaddrinfo(hostname, PORTNUM.c_str(), &servaddr, &result)) != 0) {
         perror("Error");
         exit(EXIT_FAILURE);
     }
@@ -238,11 +230,12 @@ void *process_connection(void *arg) {
             if (strcmp(tokens[0], "loc") == 0) {
                 locInfo.insert(std::pair<std::string, std::string>("address", tokens[2]));
                 locInfo.insert(std::pair<std::string, std::string>("port", tokens[3]));
+                locInfo.insert(std::pair<std::string, std::string>("fd", "0"));
                 userLocInfo[tokens[1]] = locInfo;
             } else if(strcmp(tokens[0], "i") == 0) {
                 std::cout << "You have received an invitation from ";
                 std::cout << tokens[1] << std::endl;
-                std::cout << tokens[2] << std::endl;
+                std::cout << tokens[1] << " >> " << tokens[2] << std::endl;
             } else if(strcmp(tokens[0], "ia") == 0) {
                 std::cout << "Invitation accepted by ";
                 std::cout << tokens[1] << std::endl;
@@ -377,11 +370,16 @@ int main(int argc, char *argv[]) {
                     exit(EXIT_FAILURE);
                 }
             } else if (strcmp(tokens[0], "m") == 0) {
+                // std::map<std::string, std::string> locInfo;
+                // locInfo.insert(std::pair<std::string, std::string>("address", "127.0.0.1"));
+                // locInfo.insert(std::pair<std::string, std::string>("port", PORTNUM));
+                // locInfo.insert(std::pair<std::string, std::string>("fd", "0"));
+                // userLocInfo["user2"] = locInfo;
                 std::string friend_name = tokens[1];
                 std::string msg = tokens[2];
                 if (userLocInfo.count(friend_name) == 1) {
                     if (stoi(userLocInfo[friend_name]["fd"]) == 0) {
-                        int portn = stoi(userLocInfo[friend_name]["port"]);
+                        int portn = stoi(PORTNUM);
                         clisockfd = socket(AF_INET, SOCK_STREAM, 0);
                         if (clisockfd == 0) {
                             perror("socket failed");
@@ -395,6 +393,9 @@ int main(int argc, char *argv[]) {
                             perror("connect");
                             exit(EXIT_FAILURE);
                         }
+                        userLocInfo[friend_name]["fd"] = std::to_string(clisockfd);
+                    } else {
+                        clisockfd = stoi(userLocInfo[friend_name]["fd"]);
                     }
                     std::string message = "m|" + username + "|" + msg;
                     if ((write(clisockfd, message.c_str(), message.length())) == -1) {
