@@ -417,10 +417,10 @@ int main(int argc, char *argv[]) {
                         ressave = res;
                         flag = 0;
                         do {
-                            sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+                            clisockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
                             if (sockfd < 0) 
                                 continue;
-                            if (connect(sockfd, res->ai_addr, res->ai_addrlen) == 0) {
+                            if (connect(clisockfd, res->ai_addr, res->ai_addrlen) == 0) {
                                 flag = 1;
                                 break;
                             }
