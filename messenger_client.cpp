@@ -99,6 +99,7 @@ void *connection_handler(void *arg) {
     int sockfd;
     ssize_t n;
     char buf[BUFFSIZE];
+    char *tokens[SIZE];
 
     sockfd = *((int *)arg);
     free(arg);
@@ -106,7 +107,10 @@ void *connection_handler(void *arg) {
     pthread_detach(pthread_self());
     while ((n = read(sockfd, buf, BUFFSIZE)) > 0) {
 	    buf[n] = '\0';
-	    std::cout << buf << std::endl;
+        parse_input(buf, tokens, PIPE);
+        if (strcmp(tokens[0], "m") == 0) {
+            std::cout << tokens[1] << " >> " << tokens[2] << std::endl;         
+        }
     }
     if (n == 0) {
 	    std::cout << "client closed" << std::endl;
@@ -275,7 +279,7 @@ int main(int argc, char *argv[]) {
     long portNum = 0;
     std::string port = "";
     std::string host = "";
-    struct sockaddr_in address, clisockaddr;
+    struct sockaddr_in address;
     struct addrinfo hints, *res, *ressave;
     std::string user_input;
     std::string username;
