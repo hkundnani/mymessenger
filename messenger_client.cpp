@@ -270,12 +270,13 @@ std::string menu_before() {
 }
 
 int main(int argc, char *argv[]) {
-    int clisockfd;
+    int clisockfd, rv, flag;
     int status = 1;
     long portNum = 0;
     std::string port = "";
     std::string host = "";
     struct sockaddr_in address, clisockaddr;
+    struct addrinfo hints, *res, *ressave;
     std::string user_input;
     std::string username;
     std::string password;
@@ -388,19 +389,47 @@ int main(int argc, char *argv[]) {
                 std::string msg = tokens[2];
                 if (userLocInfo.count(friend_name) == 1) {
                     if (stoi(userLocInfo[friend_name]["fd"]) == 0) {
-                        int portn = stoi(PORTNUM);
-                        clisockfd = socket(AF_INET, SOCK_STREAM, 0);
-                        if (clisockfd == 0) {
-                            perror("socket failed");
-                            exit(EXIT_FAILURE);
-                        }
-                        clisockaddr.sin_family = AF_INET;
-                        clisockaddr.sin_addr.s_addr = inet_addr(userLocInfo[friend_name]["address"].c_str());
-                        address.sin_port = htons((short)portn);
+                        // int portn = strtol(PORTNUM.c_str(), NULL, 0);
+                        // clisockfd = socket(AF_INET, SOCK_STREAM, 0);
+                        // if (clisockfd == 0) {
+                        //     perror("socket failed");
+                        //     exit(EXIT_FAILURE);
+                        // }
+                        // clisockaddr.sin_family = AF_INET;
+                        // clisockaddr.sin_addr.s_addr = inet_addr(userLocInfo[friend_name]["address"].c_str());
+                        // address.sin_port = portn;
 
-                        if (connect(clisockfd, (struct sockaddr *)&clisockaddr, sizeof(clisockaddr)) < 0) {
-                            perror("connect");
-                            exit(EXIT_FAILURE);
+                        bzero(&hints, sizeof(struct addrinfo));
+                        hints.ai_family = AF_UNSPEC;
+                        hints.ai_socktype = SOCK_STREAM;
+
+                        if ((rv = getaddrinfo(userLocInfo[friend_name]["address"].c_str(), PORTNUM.c_str(), &hints, &res)) != 0) {
+                            std::cout << "getaddrinfo wrong: " << gai_strerror(rv) << std::endl;
+                            exit(1);
+                        }
+                        // std::cout << "Address: " << userLocInfo[friend_name]["address"].c_str() << std::endl;
+                        // std::cout << "Port: " << htons((short)portn) << std::endl;
+     
+                        // if (connect(clisockfd, (struct sockaddr *)&clisockaddr, sizeof(clisockaddr)) < 0) {
+                        //     perror("connect");
+                        //     exit(EXIT_FAILURE);
+                        // }
+                        ressave = res;
+                        flag = 0;
+                        do {
+                            sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+                            if (sockfd < 0) 
+                                continue;
+                            if (connect(sockfd, res->ai_addr, res->ai_addrlen) == 0) {
+                                flag = 1;
+                                break;
+                            }
+                            close(sockfd);
+                        } while ((res = res->ai_next) != NULL);
+                        freeaddrinfo(ressave);
+                        if (flag == 0) {
+                        fprintf(stderr, "cannot connect\n");
+                        exit(1);
                         }
                         userLocInfo[friend_name]["fd"] = std::to_string(clisockfd);
                     } else {
