@@ -10,7 +10,7 @@
 #include <vector>
 #include <sys/socket.h>
 #include <sys/types.h>
-// #include <sys/wait.h>
+#include <sys/wait.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/select.h>
@@ -21,6 +21,8 @@ const char *COLON = " \t\n\r:";
 const char *PIPE = " \t\n\r|";
 const char *USER_FILE = " \t\n\r|;";
 const int MAXCLIENTS = 5;
+
+int sockfd;
 
 std::map<std::string, std::map<std::string, std::string> > userLocInfo;
 std::map<std::string, std::vector<std::string> > userFriendInfo;
@@ -93,22 +95,31 @@ bool validate_login(char *username, char *password, const char *fileName) {
     return false;
 }
 
-void add_login_users(std::string addr, std::string port, std::string username, int fd) {
+void add_login_users(std::string username, int fd) {
+    int len = 0;
+    struct sockaddr_in newaddr;
     std::map<std::string, std::string> loc_info;
     std::string user = std::to_string(fd);
 
-    loc_info.insert(std::pair<std::string, std::string>("address", addr));
-    loc_info.insert(std::pair<std::string, std::string>("port", port));
+    len = sizeof(newaddr);
+    memset(&newaddr, 0, len);
+    getpeername(fd, (struct sockaddr*)&newaddr, (socklen_t*)&len);
+
+    printf("ip %s, port %d\n",inet_ntoa(newaddr.sin_addr), (newaddr.sin_port));
+    
+    loc_info.insert(std::pair<std::string, std::string>("address", std::string(inet_ntoa(newaddr.sin_addr))));
+    loc_info.insert(std::pair<std::string, std::string>("port", std::to_string(ntohs(newaddr.sin_port))));
     loc_info.insert(std::pair<std::string, std::string>("fd", user));
     userLocInfo[username] = loc_info;
 }
 
-bool register_user(char *username, char *password, const char *fileName) {
+bool register_user(std::string username, std::string password, const char *fileName) {
     FILE *fp;
     char buffer[SIZE];
     char *tokens[SIZE];
     int flag = 0;
-    char *str = NULL; 
+    // char *str = NULL;
+    std::string str; 
 
     fp = fopen(fileName, "a+");
     if (fp == NULL) {
@@ -118,7 +129,7 @@ bool register_user(char *username, char *password, const char *fileName) {
     } else {
         while (fgets(buffer, SIZE, fp) != NULL) {
             parse_input(buffer, tokens, USER_FILE);
-            if (strcmp(tokens[0], username) == 0) {
+            if (strcmp(tokens[0], username.c_str()) == 0) {
                 flag = 1;
                 break;
             }
@@ -128,9 +139,10 @@ bool register_user(char *username, char *password, const char *fileName) {
         fclose(fp);
         return false;
     } else {
-        str = strcat(username, "|"); 
-        str = strcat(str, password);
-        fprintf(fp, "%s\n", str);
+        str = username + "|" + password;
+        // str = strcat(username, "|"); 
+        // str = strcat(str, password);
+        fprintf(fp, "%s\n", str.c_str());
         fclose(fp);
         return true;
     }
@@ -138,36 +150,38 @@ bool register_user(char *username, char *password, const char *fileName) {
 
 // TODO improve logic
 void send_location(std::string username) {
-    std::string frndName;
     std::string location;
-    std::map<std::string, std::vector<std::string> >::iterator itj;
-    std::map<std::string, std::map<std::string, std::string> >::iterator iti;
-    int fd;
+    int frndfd;
     std::string end = "done";
+    std::vector<std::string> friends_list = userFriendInfo[username];
+    std::vector<std::string> online_friends_list;
+    std::vector<std::string>::iterator name;
+    int userfd = stoi(userLocInfo[username]["fd"]);
 
-    for (iti = userLocInfo.begin(); iti != userLocInfo.end(); ++iti) {
-        for (itj = userFriendInfo.begin(); itj != userFriendInfo.end(); ++itj) {
-            frndName = itj->first;
-            for (std::vector<std::string>::iterator name = itj->second.begin(); name != itj->second.end(); ++name) {
-                if (iti->first.compare(*name) == 0) {
-                    if (userLocInfo.count(frndName) > 0) {
-                        location = "loc|" + iti->first + "|" + userLocInfo[iti->first]["address"] + "|" + userLocInfo[iti->first]["port"];
-                        fd = stoi(userLocInfo[frndName]["fd"]);
-                        if ((send(fd, &location[0], location.size(), 0)) == -1) {
-                            perror("send");
-                            // close(fd);
-                            // FD_CLR(fd, &readfds);   
-                            // clients[i] = 0;
-                        }
-                        // if ((send(fd, &end[0], end.size(), 0)) == -1) {
-                        //     perror("send");
-                        //     // close(fd);
-                        //     // FD_CLR(fd, &readfds);   
-                        //     // clients[i] = 0;
-                        // }
-                    }
-                }
+    for (name = friends_list.begin(); name != friends_list.end(); ++name) {
+        if (userLocInfo.count(*name) > 0) {
+            online_friends_list.push_back(*name);
+            location = "loc|" + username + "|" + userLocInfo[username]["address"] + "|" + userLocInfo[username]["port"] + "|end";
+            frndfd = stoi(userLocInfo[*name]["fd"]);
+            if ((send(frndfd, &location[0], location.size(), 0)) == -1) {
+                perror("send");
+                // close(fd);
+                // FD_CLR(fd, &readfds);   
+                // clients[i] = 0;
             }
+        }
+    }
+
+    for (name = online_friends_list.begin(); name != online_friends_list.end(); ++name) {
+        location = "loc|" + *name + "|" + userLocInfo[*name]["address"] + "|" + userLocInfo[*name]["port"];
+        if ((name + 1) == online_friends_list.end()) {
+            location += "|end";
+        }
+        if ((send(userfd, &location[0], location.size(), 0)) == -1) {
+            perror("send");
+            // close(fd);
+            // FD_CLR(fd, &readfds);   
+            // clients[i] = 0;
         }
     }
 }
@@ -204,13 +218,13 @@ void send_invitation(int client, char *friendName, char* msg) {
                     // FD_CLR(fd, &readfds);   
                     // clients[i] = 0;
                 }
-                message = "Invitation Sent";
-                if ((send(client, &message[0], message.size(), 0)) == -1) {
-                    perror("send");
-                    // close(fd);
-                    // FD_CLR(fd, &readfds);   
-                    // clients[i] = 0;
-                }
+                // message = "Invitation Sent";
+                // if ((send(client, &message[0], message.size(), 0)) == -1) {
+                //     perror("send");
+                //     // close(fd);
+                //     // FD_CLR(fd, &readfds);   
+                //     // clients[i] = 0;
+                // }
             }
         }
     }
@@ -227,7 +241,6 @@ void accept_invitation(int client, char *friendName, char* msg, const char *file
     char buffer[SIZE];
     char tempbuffer[SIZE];
     char *tokens[SIZE];
-    std::string success = "200";
     //file
     fpr = fopen(fileName, "r");
     if (fpr == NULL) {
@@ -255,12 +268,13 @@ void accept_invitation(int client, char *friendName, char* msg, const char *file
                 // FD_CLR(fd, &readfds);   
                 // clients[i] = 0;
             }
-            if ((send(client, &success[0], success.size(), 0)) == -1) {
-                perror("send");
-                // close(fd);
-                // FD_CLR(fd, &readfds);   
-                // clients[i] = 0;
-            }
+            // std::string success = "";
+            // if ((send(client, &success[0], success.size(), 0)) == -1) {
+            //     perror("send");
+            //     // close(fd);
+            //     // FD_CLR(fd, &readfds);   
+            //     // clients[i] = 0;
+            // }
         }
     }
     
@@ -281,23 +295,66 @@ void accept_invitation(int client, char *friendName, char* msg, const char *file
         if (tempbuffer[len] != '\n') {
             tempbuffer[len] = '\n';
         }
-        std::cout << len << std::endl;
+        // std::cout << len << std::endl;
         tempbuffer[len + 1] = '\0';
         fprintf(fpw, "%s", tempbuffer);
     }
     fclose(fpr);
     fclose(fpw);
     rename("temp", fileName);
+
+    send_location(username);
+}
+
+void logout_user(int clientfd) {
+    std::map<std::string, std::map<std::string, std::string> >::iterator iti;
+    std::string username;
+    std::vector<std::string>::iterator name;
+    std::string msg;
+    int frndfd;
+
+    for (iti = userLocInfo.begin(); iti != userLocInfo.end(); ++iti) {
+        if (stoi(iti->second["fd"]) == clientfd) {
+            username = iti->first;
+        }
+    }
+    std::vector<std::string> friends_list = userFriendInfo[username];
+
+    for (name = friends_list.begin(); name != friends_list.end(); ++name) {
+        if (userLocInfo.count(*name) > 0) {
+            msg = "logout|" + username;
+            frndfd = stoi(userLocInfo[*name]["fd"]);
+            if ((send(frndfd, &msg[0], msg.size(), 0)) == -1) {
+                perror("send");
+                // close(fd);
+                // FD_CLR(fd, &readfds);   
+                // clients[i] = 0;
+            }
+        }
+    }
+    userFriendInfo.erase(username);
+    userLocInfo.erase(username);
+}
+
+void sig_chld(int signo)
+{
+	pid_t pid;
+	int stat;
+	while ((pid = waitpid(-1, &stat, WNOHANG)) > 0) {}
+		close(sockfd);
+	return ;
 }
 
 int main(int argc, char *argv[]) {
-    int sockfd, maxfd, clients[MAXCLIENTS], clientfd, len, index, num = 0;
+    int maxfd, clients[MAXCLIENTS], clientfd, len, index, num = 0;
     std::string port = "";
     char *tokens[SIZE];
     char hostname[SIZE];
+    struct sigaction sa;
     struct sockaddr_in newaddr;
     struct addrinfo address, *result, *addr;
     std::string username;
+    std::string password;
     //set of socket descriptors  
     fd_set readfds, clfds;
 
@@ -305,6 +362,12 @@ int main(int argc, char *argv[]) {
         printf("%s\n", "Server program needs user info and config file as parameters" );
         exit(EXIT_FAILURE);
     }
+
+    sa.sa_handler = sig_chld;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = 0;
+
+	sigaction(SIGCHLD, &sa, NULL);
 
     get_port(argv[2], port);
     if (port.compare("") == 0) {
@@ -452,11 +515,11 @@ int main(int argc, char *argv[]) {
                             username = tokens[1];
                             if (validate_login(tokens[1], tokens[2], argv[1])) {
                                 
-                                add_login_users(std::string(inet_ntoa(newaddr.sin_addr)), std::to_string(ntohs(newaddr.sin_port)), username, clients[i]);
+                                add_login_users(username, clients[i]);
                                    
-                                strcpy(sendbuff, "200");
+                                strcpy(sendbuff, "l|200");
                             } else {
-                                strcpy(sendbuff, "500");
+                                strcpy(sendbuff, "l|500");
                             }
                             if ((send(clients[i], sendbuff, sizeof(sendbuff), 0)) == -1)
                             {
@@ -465,18 +528,19 @@ int main(int argc, char *argv[]) {
                                 FD_CLR(clients[i], &readfds);   
                                 clients[i] = 0;
                             }
-                            if (strcmp(sendbuff, "200") == 0) {
+                            if (strcmp(sendbuff, "l|200") == 0) {
                                 send_location(username);
                             }   
                         } else if (strcmp(tokens[0], "register") == 0) {
                             username = tokens[1];
-                            if (register_user(tokens[1], tokens[2], argv[1])) {
+                            password = tokens[2];
+                            if (register_user(username, password, argv[1])) {
                                 
-                                add_login_users(std::string(inet_ntoa(newaddr.sin_addr)), std::to_string(ntohs(newaddr.sin_port)), username, clients[i]);
+                                add_login_users(username, clients[i]);
                                 
-                                strcpy(sendbuff, "200");
+                                strcpy(sendbuff, "r|200");
                             } else {
-                                strcpy(sendbuff, "500");
+                                strcpy(sendbuff, "r|500");
                             }
                             if ((send(clients[i], sendbuff, sizeof(sendbuff), 0)) == -1)
                             {
@@ -486,9 +550,17 @@ int main(int argc, char *argv[]) {
                                 clients[i] = 0;
                             }
                         } else if (strcmp(tokens[0], "i") == 0) {
+                            if (tokens[2] == NULL) {
+                                strcpy(tokens[2], "");
+                            }
                             send_invitation(clients[i], tokens[1], tokens[2]);
                         } else if (strcmp(tokens[0], "ia") == 0) {
+                            if (tokens[2] == NULL) {
+                                strcpy(tokens[2], "");
+                            }
                             accept_invitation(clients[i], tokens[1], tokens[2], argv[1]);
+                        } else if (strcmp(tokens[0], "logout") == 0) {
+                            logout_user(clients[i]);
                         }
                     }
                 }
